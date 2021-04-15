@@ -1,7 +1,8 @@
 # Token types
+#
 # EOF (end-of-file) token is used to indicate that
 # there is no more input left for lexical analysis
-INTEGER, PLUS, MINUS, MULTIPLY, DIVIDE, EOF = 'INTEGER', 'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE', 'EOF'
+INTEGER, PLUS, MINUS, MUL, DIV, EOF = 'INTEGER', 'PLUS', 'MINUS', "MUL", "DIV", 'EOF'
 
 
 class Token(object):
@@ -16,7 +17,7 @@ class Token(object):
 
         Examples:
             Token(INTEGER, 3)
-            Token(PLUS '+')
+            Token(PLUS, '+')
         """
         return 'Token({type}, {value})'.format(
             type=self.type,
@@ -29,7 +30,7 @@ class Token(object):
 
 class Interpreter(object):
     def __init__(self, text):
-        # client string input, e.g. "3 + 5", "12 - 5", etc
+        # client string input, e.g. "3 + 5", "12 - 5 + 3", etc
         self.text = text
         # self.pos is an index into self.text
         self.pos = 0
@@ -37,11 +38,14 @@ class Interpreter(object):
         self.current_token = None
         self.current_char = self.text[self.pos]
 
+    ##########################################################
+    # Lexer code                                             #
+    ##########################################################
     def error(self):
-        raise Exception('Error parsing input')
+        raise Exception('Invalid syntax')
 
     def advance(self):
-        """Advance the 'pos' pointer and set the 'current_char' variable."""
+        """Advance the `pos` pointer and set the `current_char` variable."""
         self.pos += 1
         if self.pos > len(self.text) - 1:
             self.current_char = None  # Indicates end of input
@@ -64,7 +68,7 @@ class Interpreter(object):
         """Lexical analyzer (also known as scanner or tokenizer)
 
         This method is responsible for breaking a sentence
-        apart into tokens.
+        apart into tokens. One token at a time.
         """
         while self.current_char is not None:
 
@@ -82,19 +86,22 @@ class Interpreter(object):
             if self.current_char == '-':
                 self.advance()
                 return Token(MINUS, '-')
-            
+
             if self.current_char == '*':
                 self.advance()
-                return Token(MULTIPLY, '*')
-            
+                return Token(MUL, '*')
+
             if self.current_char == '/':
                 self.advance()
-                return Token(DIVIDE, '/')
+                return Token(DIV, '/')
 
             self.error()
 
         return Token(EOF, None)
 
+    ##########################################################
+    # Parser / Interpreter code                              #
+    ##########################################################
     def eat(self, token_type):
         # compare the current token type with the passed token
         # type and if they match then "eat" the current token
@@ -105,56 +112,35 @@ class Interpreter(object):
         else:
             self.error()
 
-    def expr(self):
-        """Parser / Interpreter
+    def term(self):
+        """Return an INTEGER token value."""
+        token = self.current_token
+        self.eat(INTEGER)
+        return token.value
 
-        expr -> INTEGER PLUS INTEGER
-        expr -> INTEGER MINUS INTEGER
-        """
+    def expr(self):
+        """Arithmetic expression parser / interpreter."""
         # set current token to the first token taken from the input
         self.current_token = self.get_next_token()
 
-        # we expect the current token to be an integer
-        left = self.current_token
-        self.eat(INTEGER)
+        result = self.term()
+        while self.current_token.type in (PLUS, MINUS, MUL, DIV):
+            token = self.current_token
+            if token.type == PLUS:
+                self.eat(PLUS)
+                result = result + self.term()
+            elif token.type == MINUS:
+                self.eat(MINUS)
+                result = result - self.term()
 
-        # we expect the current token to be either a '+' or '-'
-        op = self.current_token
-        if op.type == PLUS:
-            self.eat(PLUS)
-            
-        if op.type == MINUS:
-            self.eat(MINUS)
-            
-        if op.type == MULTIPLY:
-            self.eat(MULTIPLY)
-            
-        if op.type == DIVIDE:
-            self.eat(DIVIDE)
+            elif token.type == MUL:
+                self.eat(MUL)
+                result = result * self.term()
 
-        # we expect the current token to be an integer
-        right = self.current_token
-        self.eat(INTEGER)
-        # after the above call the self.current_token is set to
-        # EOF token
+            elif token.type == DIV:
+                self.eat(DIV)
+                result = result / self.term()
 
-        # at this point either the INTEGER PLUS INTEGER or
-        # the INTEGER MINUS INTEGER sequence of tokens
-        # has been successfully found and the method can just
-        # return the result of adding or subtracting two integers,
-        # thus effectively interpreting client input
-        if op.type == PLUS:
-            result = left.value + right.value
-            
-        if op.type == MINUS:
-            result = left.value - right.value
-            
-        if op.type == MULTIPLY:
-            result = left.value * right.value
-            
-        if op.type == DIVIDE:
-            result = left.value / right.value
-            
         return result
 
 
